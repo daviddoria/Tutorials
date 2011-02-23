@@ -1,0 +1,215 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage[utf8x]{inputenc}
+\usepackage{amsmath} % for cases{}
+
+%opening
+\title{Belief Propagation on MRFs}
+\author{David Doria}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+\label{sec:Introduction}
+Belief propagation (BP) is a technique which can be used to find the optimal labeling of a graphical model. BP can be defined and explained using different terminology and notation for Bayesian networks, factor graphs, and Markov random fields (MRFs). We have chosen to exclusively use the notation of MRFs throughout this discussion. This choice greatly simplifies the notation, as the energy functions are a function only of the labels of a pair of neighboring nodes, whereas in the more general framework of factor graphs, these functions are a function of the node labels as well as the node ids. In this document we explain the ``sum-product message passing'' algorithm for performing this optimization.
+
+\section{Warning}
+On graphicals model with a tree structure, belief propagation is an exact optimization method. That is, it is guaranteed to produce the correct result and it is guaranteed to converge. However, MRFs do not exhibit this tree structure - there are many ``loops'' in the graph of an MRF. With only a slight modification (described in Section \ref{sec:MessagePassing:Initialization}), the BP algorithm has been shown to ``usually work'' on loopy graphs. When BP is applied to a loopy graphical model, it is known as Loopy Belief Propagation, or Loopy BP.
+
+%%%%%%%%%%%%%%%
+\section{Notation}
+\subsection{Neighbors}
+We will often need to refer to the neighbors of a node. We define the function $N(x)$ to mean all neighbors of node x.
+\begin{equation}
+N(x) = \mbox{All neighbors of node x}
+\end{equation}
+
+We will also need to refer to all of the neighbors of a node except for a particular node. We use the set theoretic notation $N(x)\backslash y$ to mean all neighbors of node x except for y.
+\begin{equation}
+N(x)\backslash y = \mbox{All neighbors of node x except for y}
+\end{equation}
+
+\subsection{Labels}
+\subsubsection{Refering to a node's label}
+We will use the notation $l_n$ to refer to the label of node $n$.
+
+\subsubsection{Possible label set}
+The set of possible labels is denoted $L$. The size of the label set $|L|$ is the number of possible labels. The $i^{th}$ label is denoted $L(i)$.
+
+
+%%%%%%%%%%%%%%%
+\section{Terminology}
+The idea of a message passing algorithm is for each node in a graphical model to ``tell'' its neighbors what it ``believes'' about their labeling. As a simple example, in a binary labeling problem, node A might ``say'' to node B ``Hey node B, I'm pretty sure that you should be label 0''. Of course, this notion of ``pretty sure'' is more formally defined as a value similar to a likelihood.
+
+A ``message'' is ``passed'' from a node $i$ to one of its neighbors node $j$ indicating the the amount that node $i$ ``believes'' that node $j$ should be a particular label. One of these messages must be sent for each label in the label set $L$. That is, if node $j$ could take one of $|L|$ labels, there are $|L|$ messages to be passed from node $i$ to node $j$.
+
+%%%%%%%%%%%%%%%
+\section{Energy functions}
+\label{sec:EnergyFunctions}
+\subsection{Unary}
+\label{sec:EnergyFunctions:Unary}
+The unary energy function defines the energy (cost) for any node to take the label $L(x)$.
+\begin{equation}
+ U(L(x)) = \mbox{Energy of a node taking the label } L(x)
+\end{equation}
+
+\subsection{Binary}
+\label{sec:EnergyFunctions:Binary}
+The binary energy function defines the energy (cost) for any two neighboring nodes to take the labels $L(x)$ and $L(y)$. As mentioned in Section \ref{sec:Introduction}, in an MRF setting this function is only a function of two labels - not a function of the node ids.
+\begin{equation}
+ B(L(x),L(y)) = \mbox{Energy of neighboring nodes taking labels } L(x) \mbox{ and } L(y)
+\end{equation}
+
+
+%%%%%%%%%%%%%%%
+\section{Message Passing}
+\label{sec:MessagePassing}
+
+\section{Initialization}
+\label{sec:MessagePassing:Initialization}
+As you will see in Section \ref{sec:MessageUpdate}, to update the messages originating at a node, you must know all of the incoming messages to the node. This is a ``chicken and the egg'' problem. This is exactly what leads to the necessary modification from BP to Loopy BP. For standard BP (on a tree) you can traverse from the node to the leaves and always have visited ``parent'' nodes before all of their ``children'', so this is not an issue. In fact, the order of traversal is well defined (which it is not in Loopy BP (see Section \ref{sec:UpdateSchedule}).
+
+The modification to the algorithm which must be done to start Loopy BP is simply to initialize messages to 1.
+
+\section{Message update}
+\label{sec:MessageUpdate}
+To update each message from node $i$ to node $j$, the following equation is used (see Section \ref{sec:UpdateSchedule} for the order in which to update the messages).
+
+\begin{equation}
+m_{ij}(l) = \sum_{p \in L} \left[ e^{-B(L(p), L(l))} e^{-U(L(p))} \prod_{k=N(i)\backslash j}  m_{ki}(L(p)) \right]
+\end{equation}
+
+It is from this equation that the algorithm gets its name - the ``Sum-Product'' algorithm. You can see that the message update equation (the main part of the algorithm) is the sum of a product. In the update equation, $l$ is the particular label that the belief in the message pertains to. There are $|L|$ such messages between nodes $i$ and $j$ (i.e. $l \in |L|$).
+
+We now explain each part of this equation.
+
+\begin{itemize}
+\item 
+$  m_{ij}(l)$
+  
+  This is the message from node $i$ to node $j$ containing information about node $i$'s belief that node $j$ is in state $l$.
+
+\item 
+  $  \sum_{p \in L}$
+
+This is a summation over $p$ (the variable name $p$ was chosen arbitrarily) where $p$ assumes all of the possible labels.
+
+\item 
+$  B(L(p), L(l))$
+
+This is the energy (recall from Section \ref{sec:EnergyFunctions:Binary} that $B$ is the name of the binary energy function) of neighboring nodes having labels $L(p)$ and $L(l)$.
+
+\item 
+  $  U(L(p))$
+
+This is the energy (recall from Section \ref{sec:EnergyFunctions:Unary} that $U$ is the name of the unary energy function) of a node having label $L(p)$.
+
+\item 
+  $  \prod_{k=N(i)\backslash j}$
+
+This is a product over $k$ (the variable name $k$ was chosen arbitrarily) where $k$ assumes the values of the ids of all nodes neighboring node $i$ except for node $j$.
+
+\item 
+  
+  $m_{ki}(L(p))$
+
+This is an incoming message to node $i$ from node $k$ containing information about node $k$'s belief of node $i$ taking the value $L(p)$. (Note that if message $m_{ki}(L(p))$ was not computed before this update of $m_{ij}(l)$, there would be a problem. This is why the initializtaion to 1 (Section \ref{sec:MessagePassing:Initialization}) is necessary.)
+
+\end{itemize}
+
+\subsection{Normalization}
+As each message is pased, the set of messages between the pair of nodes should be normalized. Without this normalization, each time a message is passed the value of the message gets smaller (it is continually multiplied by a number less than 1), and eventually the value will become ``$0$'' to floating point precision. To fix this, we simply divide the value of each message from node $i$ to node $j$ by the sum over all of the values of the messages for all labels $l$:
+\begin{equation}
+m_{ij} \leftarrow \frac{m_{ij}}{\sum_{l}m_{ij}(l)}
+\end{equation}
+
+
+\subsection{Update Schedule}
+\label{sec:UpdateSchedule}
+As noted in \ref{sec:MessagePassing:Initialization}, there is no natural ordering of the nodes in an MRF. Because of this, you can update message in any order you would like. Often, a raster scan of the MRF is used. Alternatively, the message to update can also be selected at random.
+
+\subsection{Stopping Condition}
+\label{sec:StoppingConditions}
+The selected update schedule (Section \ref{sec:UpdateSchedule}) can be followed until your choice of stopping conditions is met:
+\begin{itemize}
+ \item A fixed number of iterations
+ \item Fewer than a specified number of messages are changed
+ \item All messags are changed by an amount less than a specified threshold
+\end{itemize}
+
+
+%%%%%%%%%%%%%
+\section{Belief Computation}
+Once the selected stopping conditions (Section \ref{sec:StoppingConditions}) have been met, the optimal labeling can be computed with
+\begin{equation}
+ Belief(\mbox{node } i \mbox{ takes label } l) = U(l) \prod _{k = N(i)} m_{ki} (l)
+\end{equation}
+
+That is, the belief that node $i$ takes label $l$ is the unary cost of label $l$ ($U(l)$) multiplied by the product of the incoming messages of node $i$ about label $l$ ($\prod _{k = N(i)} m_{ki} (l)$).
+
+%%%%%%%%%%%%%
+\section{Optimal Labeling}
+The optimal labeling of node $i$ is determined simply by selecting the label $l$ for which $Belief(\mbox{node } i \mbox{ takes label } l)$ is the largest.
+
+%%%%%%%%%%%%%
+\section{Example Application - Binary Denoising}
+The binary denoising problem takes a binary image as input and outputs a binary image that has had the ``noise removed''. To solve this problem using the BP framework presented, we must simply specify appropriate cost functions.
+
+\subsection{Label set}
+In this problem, the label set $L$ is ${0,1}$, and hence $|L| = 2$. That is, every node (pixel) can either take the value $0$ or $1$ (a binary image).
+
+\subsection{Unary Cost}
+In this problem, the input image is called the ``observations''. The cost of assigning a node a particular label is related to if the label agrees with the observations. One such function is:
+
+\begin{equation}
+Unary(node, label) = 
+\begin{cases} 
+.2 & \text{if } observation(node) = label
+\\
+.8 & \text{otherwise }
+\end{cases}
+\end{equation}
+
+This function encourages the resulting labeling to be the same as the observations.  If a node's label is the same as its original observation, the cost is $.2$. If a node's label is different from its original observation, the cost is $.8$.
+
+\subsection{Binary Cost}
+In a denoising problem, typically ``smoothness'' is the goal. That is, a node is likely to take the same label as its neighbors. The binary cost should encourage this  smoothness. One such function to achieve this is:
+
+\begin{equation}
+Binary(label1, label2) = 
+\begin{cases} 
+0 & \text{if } label1 = label2
+\\
+1 &\text{otherwise}
+\end{cases}
+\end{equation}
+This means if a node's label is the same as its neighbor, the cost is $0$. If neighboring labels are different, the cost is $1$.
+
+\section{Variants}
+\section{Max-Product Algorithm}
+The max-product algorithm simply changes the message update equation from
+\begin{equation}
+m_{ij}(l) = \sum_{p \in L} \left[ e^{-B(L(p), L(l))} e^{-U(L(p))} \prod_{k=N(i)\backslash j}  m_{ki}(L(p)) \right]
+\end{equation}
+(in the sum-product algorithm)
+
+to
+
+\begin{equation}
+m_{ij}(l) = \max_{p \in L} \left[ e^{-B(L(p), L(l))} e^{-U(L(p))} \prod_{k=N(i)\backslash j}  m_{ki}(L(p))  \right]
+\end{equation}
+
+\section{Min-Sum Algorithm}
+The min-sum algorithm simply changes the message update equation from 
+\begin{equation}
+m_{ij}(l) = \max_{p \in L} \left[ e^{-B(L(p), L(l))} e^{-U(L(p))} \prod_{k=N(i)\backslash j}  m_{ki}(L(p))  \right]
+\end{equation}
+(in the max-product algorithm) to
+
+\begin{equation}
+m_{ij}(l) = \min_{p \in L} \left[ B(L(p), L(l)) + U(L(p)) + \sum_{k=N(i)\backslash j}  m_{ki}(L(p))  \right]
+\end{equation}
+
+Note: With this algorithm, messages should be initialized to $0$ instead of $1$.
+\end{document}
